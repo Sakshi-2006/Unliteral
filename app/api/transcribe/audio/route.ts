@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server'
-import { transcriptionProvider } from '../../../../lib/transcriptionProviders'
+import { transcriptionProvider, TranscriptionRuntimeError } from '../../../../lib/transcriptionProviders'
 
 export async function POST(request: Request) {
   try {
+    console.log('[v0] transcription request reached server', { route: '/api/transcribe/audio', method: request.method })
     const form = await request.formData()
     const file = form.get('audio')
     const sourceLanguage = form.get('sourceLanguage')?.toString()
     if (!(file instanceof File)) return NextResponse.json({ error: 'Audio file is required.' }, { status: 400 })
     const result = await transcriptionProvider.transcribeAudio(file, sourceLanguage)
+    console.log('[v0] transcription response sent', { route: '/api/transcribe/audio', httpStatus: 200, transcriptLength: result.transcript.length })
     return NextResponse.json(result)
   } catch (error) {
-    const message = error instanceof Error && error.message.includes('not configured') ? 'Transcription could not be completed. Please try again.' : 'Transcription could not be completed. Please try again.'
-    return NextResponse.json({ error: message }, { status: 502 })
+    const status = error instanceof TranscriptionRuntimeError ? error.status : 502
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[v0] transcription route failed', { route: '/api/transcribe/audio', httpStatus: status, error: message.slice(0, 500) })
+    return NextResponse.json({ error: message }, { status })
   }
 }
