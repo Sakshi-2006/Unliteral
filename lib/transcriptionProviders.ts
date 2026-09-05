@@ -7,11 +7,10 @@ export interface TranscriptionProvider {
 
 import { GoogleGenAI } from '@google/genai'
 
-const TRANSCRIPTION_MODEL = 'gemini-3.5-transcribe'
+const TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
 
 function getClient() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
-  console.log('[v0] transcription runtime diagnostics', { apiKeyPresent: Boolean(apiKey), model: TRANSCRIPTION_MODEL })
   if (!apiKey) throw new TranscriptionRuntimeError('Gemini API key is not configured.', 503)
   return new GoogleGenAI({ apiKey })
 }
@@ -27,12 +26,10 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
   private async transcribe(file: File | Blob, mediaType: string, sourceLanguage?: string): Promise<TranscriptionResult> {
     const started = Date.now()
     const bytes = Buffer.from(await file.arrayBuffer())
-    console.log('[v0] transcription file received', { filename: file instanceof File ? file.name : 'blob', mimeType: mediaType, fileSize: bytes.byteLength, sourceLanguage: sourceLanguage || 'Auto Detect' })
     const ai = getClient()
     let uploaded
     try {
       uploaded = await ai.files.upload({ file: new Blob([bytes], { type: mediaType }), config: { mimeType: mediaType, displayName: file instanceof File ? file.name : 'unliteral-media' } })
-      console.log('[v0] Gemini file upload', { status: 'success', name: uploaded.name, uriPresent: Boolean(uploaded.uri) })
     } catch (error) {
       const raw = error instanceof Error ? error.message : String(error)
       console.error('[v0] Gemini file upload', { status: 'error', error: raw.slice(0, 500) })
@@ -44,15 +41,12 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
       await new Promise(resolve => setTimeout(resolve, 1000))
       processed = await ai.files.get({ name: uploaded.name })
     }
-    console.log('[v0] Gemini file processing', { name: uploaded.name, state: processed.state, uriPresent: Boolean(processed.uri) })
     if (processed.state !== 'ACTIVE') throw new TranscriptionRuntimeError(processed.error?.message || 'Gemini could not process this media file.', 502)
     const languageHint = sourceLanguage && sourceLanguage !== 'Auto Detect' ? ` The source language is ${sourceLanguage}; preserve it exactly.` : ' Detect the source language automatically.'
     const payload = { role: 'user' as const, parts: [{ text: `Transcribe all spoken dialogue in this media exactly. Return only the transcript with no commentary.${languageHint}` }, { fileData: { fileUri: processed.uri, mimeType: processed.mimeType || mediaType } }] }
-    console.log('[v0] Gemini file reference prepared', { uploadStatus: 'success', processingState: processed.state, mimeType: processed.mimeType || mediaType, model: TRANSCRIPTION_MODEL })
     let response
     try {
       response = await ai.models.generateContent({ model: TRANSCRIPTION_MODEL, contents: [payload] })
-      console.log('[v0] Gemini transcription request', { status: 'success', model: TRANSCRIPTION_MODEL })
     } catch (error) {
       const raw = error instanceof Error ? error.message : String(error)
       const statusMatch = raw.match(/\b(4\d\d|5\d\d)\b/)
@@ -63,7 +57,6 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
     const candidateText = typeof response.text === 'string' ? response.text : ''
     const candidateParts = (response as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }).candidates?.flatMap(candidate => candidate.content?.parts?.map(part => part.text || '') || []) || []
     const transcript = (candidateText || candidateParts.join(' ')).trim()
-    console.log('[v0] Gemini transcript extraction', { status: transcript ? 'success' : 'empty', transcriptLength: transcript.length, candidateCount: response.candidates?.length || 0 })
     if (!transcript) throw new TranscriptionRuntimeError('Gemini returned no transcript. The media may contain no detectable speech.', 502)
     try { await ai.files.delete({ name: uploaded.name }) } catch (cleanupError) { console.warn('[v0] Gemini file cleanup failed', { name: uploaded.name, error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError) }) }
     return { transcript, language: sourceLanguage || 'Auto Detect', duration: Math.round((Date.now() - started) / 1000) }
