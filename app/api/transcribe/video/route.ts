@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { transcriptionProvider, TranscriptionRuntimeError } from '../../../../lib/transcriptionProviders'
+import { validateVideoFile } from '../../../../lib/mediaValidation'
 
 export async function POST(request: Request) {
   try {
@@ -8,6 +9,9 @@ export async function POST(request: Request) {
     const file = form.get('video')
     const sourceLanguage = form.get('sourceLanguage')?.toString()
     if (!(file instanceof File)) return NextResponse.json({ error: 'Video file is required.' }, { status: 400 })
+    const validation = validateVideoFile(file)
+    console.log('[v0] video validation', { filename: file.name, mimeType: file.type || 'empty', extension: validation.extension, accepted: validation.accepted })
+    if (!validation.accepted) return NextResponse.json({ error: validation.reason }, { status: 415 })
     const result = await transcriptionProvider.transcribeVideo(file, sourceLanguage)
     console.log('[v0] transcription response sent', { route: '/api/transcribe/video', httpStatus: 200, transcriptLength: result.transcript.length })
     return NextResponse.json(result)
