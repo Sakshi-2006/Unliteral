@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     const result = await transcriptionProvider.transcribeAudio(file)
     return NextResponse.json(result)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to generate transcript. Please try again.'
-    return NextResponse.json({ error: message }, { status: message.includes('not configured') ? 503 : 502 })
+    const message = error instanceof Error && error.message.includes('not configured') ? 'Transcription could not be completed. Please try again.' : 'Transcription could not be completed. Please try again.'
+    return NextResponse.json({ error: message }, { status: 502 })
   }
 }
