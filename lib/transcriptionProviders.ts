@@ -65,6 +65,7 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
   async transcribeAudio(file: File | Blob, sourceLanguage?: string): Promise<TranscriptionResult> {
     const filename = file instanceof File ? file.name : 'audio.webm'
     const mediaType = normalizeAudioMime(filename, file.type || 'audio/webm')
+    console.log('[v0] audio transcription upload', { originalFilename: filename, extension: filename.toLowerCase().split('.').pop() || '', fileType: file.type || 'empty', normalizedMimeType: mediaType, fileSize: file.size })
     return this.transcribe(file, mediaType, sourceLanguage)
   }
   async transcribeVideo(file: File | Blob, sourceLanguage?: string): Promise<TranscriptionResult> {
