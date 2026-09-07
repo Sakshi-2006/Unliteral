@@ -8,7 +8,7 @@ export interface TranscriptionProvider {
 import { GoogleGenAI } from '@google/genai'
 import { normalizeAudioMime } from './mediaValidation'
 
-const TRANSCRIPTION_MODEL = 'gemini-3.6-flash'
+const TRANSCRIPTION_MODEL = 'gemini-3.5-transcribe'
 
 function getClient() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -44,13 +44,15 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
     }
     if (processed.state !== 'ACTIVE') throw new TranscriptionRuntimeError(processed.error?.message || 'Gemini could not process this media file.', 502)
     const languageHint = sourceLanguage && sourceLanguage !== 'Auto Detect' ? ` The source language is ${sourceLanguage}; preserve it exactly.` : ' Detect the source language automatically.'
-    const requestMimeType = processed.mimeType || mediaType
-    const requestStructure = { model: TRANSCRIPTION_MODEL, contents: [{ role: 'user', parts: [{ text: 'transcription prompt' }, { fileData: { fileUri: processed.uri, mimeType: requestMimeType } }] }] }
-    console.log('[v0] Gemini transcription request prepared', { filename: file instanceof File ? file.name : 'audio.webm', detectedMimeType: file.type || 'empty', normalizedMimeType: mediaType, uploadedMimeType: processed.mimeType || 'empty', requestMimeType, fileSize: bytes.byteLength, model: TRANSCRIPTION_MODEL, fileUri: processed.uri, requestStructure })
-    const payload = { role: 'user' as const, parts: [{ text: `Transcribe all spoken dialogue in this media exactly. Return only the transcript with no commentary.${languageHint}` }, { fileData: { fileUri: processed.uri, mimeType: requestMimeType } }] }
-    let response
+    const requestMimeType = 'audio/mpeg'
+    const requestStructure = { model: TRANSCRIPTION_MODEL, input: [{ type: 'text', text: 'Generate a transcript of the speech in this audio.' + languageHint }, { type: 'audio', uri: processed.uri, mime_type: requestMimeType }] }
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    let response: { output_text?: string }
     try {
-      response = await ai.models.generateContent({ model: TRANSCRIPTION_MODEL, contents: [payload] })
+      const interactionResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/interactions?key=${encodeURIComponent(apiKey || '')}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestStructure) })
+      const body = await interactionResponse.json() as { output_text?: string; error?: unknown }
+      if (!interactionResponse.ok) throw Object.assign(new Error(JSON.stringify(body.error || body)), { status: interactionResponse.status })
+      response = body
     } catch (error) {
       const details = error && typeof error === 'object' ? error as { message?: string; status?: number; statusText?: string; error?: unknown; details?: unknown } : undefined
       const raw = details?.message || (error instanceof Error ? error.message : String(error))
@@ -60,9 +62,7 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
       console.error('[v0] Gemini transcription request failed', { ...usefulError, model: TRANSCRIPTION_MODEL, requestStructure })
       throw new TranscriptionRuntimeError(JSON.stringify(usefulError), status)
     }
-    const candidateText = typeof response.text === 'string' ? response.text : ''
-    const candidateParts = (response as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }).candidates?.flatMap(candidate => candidate.content?.parts?.map(part => part.text || '') || []) || []
-    const transcript = (candidateText || candidateParts.join(' ')).trim()
+    const transcript = (response.output_text || '').trim()
     if (!transcript) throw new TranscriptionRuntimeError('Gemini returned no transcript. The media may contain no detectable speech.', 502)
     try { await ai.files.delete({ name: uploaded.name }) } catch (cleanupError) { console.warn('[v0] Gemini file cleanup failed', { name: uploaded.name, error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError) }) }
     return { transcript, language: sourceLanguage || 'Auto Detect', duration: Math.round((Date.now() - started) / 1000) }
