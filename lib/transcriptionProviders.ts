@@ -44,14 +44,34 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
     }
     if (processed.state !== 'ACTIVE') throw new TranscriptionRuntimeError(processed.error?.message || 'Gemini could not process this media file.', 502)
     const languageHint = sourceLanguage && sourceLanguage !== 'Auto Detect' ? ` The source language is ${sourceLanguage}; preserve it exactly.` : ' Detect the source language automatically.'
-    const requestMimeType = 'audio/mpeg'
-    const requestStructure = { model: TRANSCRIPTION_MODEL, input: [{ type: 'text', text: 'Generate a transcript of the speech in this audio.' + languageHint }, { type: 'audio', uri: processed.uri, mime_type: requestMimeType }] }
+    const requestMimeType = mediaType
+    const isVideo = mediaType.startsWith('video/')
+    const requestStructure = { model: TRANSCRIPTION_MODEL, input: [{ type: 'text', text: `Generate a transcript of the speech in this ${isVideo ? 'video' : 'audio'}.${languageHint}` }, { type: isVideo ? 'video' : 'audio', uri: processed.uri, mime_type: requestMimeType }] }
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
-    let response: { output_text?: string }
+    let response: { output_text?: string; error?: unknown }
     try {
+      console.log('[v0] Gemini request', {
+        model: TRANSCRIPTION_MODEL,
+        mediaType,
+        uploadedName: uploaded.name,
+        uploadedUri: processed.uri,
+        processedState: processed.state,
+        requestStructure,
+      })
       const interactionResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/interactions?key=${encodeURIComponent(apiKey || '')}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestStructure) })
-      const body = await interactionResponse.json() as { output_text?: string; error?: unknown }
-      if (!interactionResponse.ok) throw Object.assign(new Error(JSON.stringify(body.error || body)), { status: interactionResponse.status })
+      const responseText = await interactionResponse.text()
+      console.log('[v0] Gemini raw response', {
+        status: interactionResponse.status,
+        statusText: interactionResponse.statusText,
+        body: responseText,
+      })
+      let body: { output_text?: string; error?: unknown }
+      try {
+        body = JSON.parse(responseText) as { output_text?: string; error?: unknown }
+      } catch {
+        body = { error: responseText }
+      }
+      if (!interactionResponse.ok) throw Object.assign(new Error(responseText), { status: interactionResponse.status })
       response = body
     } catch (error) {
       const details = error && typeof error === 'object' ? error as { message?: string; status?: number; statusText?: string; error?: unknown; details?: unknown } : undefined
