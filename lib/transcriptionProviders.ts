@@ -6,6 +6,7 @@ export interface TranscriptionProvider {
 }
 
 import { GoogleGenAI } from '@google/genai'
+import { normalizeAudioMime } from './mediaValidation'
 
 const TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
 
@@ -62,7 +63,9 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
     return { transcript, language: sourceLanguage || 'Auto Detect', duration: Math.round((Date.now() - started) / 1000) }
   }
   async transcribeAudio(file: File | Blob, sourceLanguage?: string): Promise<TranscriptionResult> {
-    return this.transcribe(file, file.type || 'audio/webm', sourceLanguage)
+    const filename = file instanceof File ? file.name : 'audio.webm'
+    const mediaType = normalizeAudioMime(filename, file.type || 'audio/webm')
+    return this.transcribe(file, mediaType, sourceLanguage)
   }
   async transcribeVideo(file: File | Blob, sourceLanguage?: string): Promise<TranscriptionResult> {
     return this.transcribe(file, file.type || 'video/mp4', sourceLanguage)

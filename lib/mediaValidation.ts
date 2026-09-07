@@ -1,11 +1,15 @@
 export const AUDIO_EXTENSIONS = ['mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac'] as const
-export const AUDIO_MIME_TYPES = ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/x-m4a', 'audio/ogg', 'audio/webm', 'audio/flac'] as const
+export const AUDIO_MIME_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/x-mpeg', 'application/mp3', 'application/octet-stream', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/x-m4a', 'audio/ogg', 'audio/webm', 'audio/flac'] as const
 
 const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'mkv', 'avi'] as const
 const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska', 'video/x-msvideo'] as const
 
 function extensionOf(name: string) {
   return name.toLowerCase().split('.').pop() || ''
+}
+
+export function normalizeAudioMime(name: string, mimeType: string) {
+  return extensionOf(name) === 'mp3' ? 'audio/mpeg' : mimeType
 }
 
 export function validateAudioFile(file: Pick<File, 'name' | 'type'>) {
