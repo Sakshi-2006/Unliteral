@@ -8,7 +8,7 @@ export interface TranscriptionProvider {
 import { GoogleGenAI } from '@google/genai'
 import { normalizeAudioMime } from './mediaValidation'
 
-const TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
+const TRANSCRIPTION_MODEL = 'gemini-3.6-flash'
 
 function getClient() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -44,16 +44,21 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
     }
     if (processed.state !== 'ACTIVE') throw new TranscriptionRuntimeError(processed.error?.message || 'Gemini could not process this media file.', 502)
     const languageHint = sourceLanguage && sourceLanguage !== 'Auto Detect' ? ` The source language is ${sourceLanguage}; preserve it exactly.` : ' Detect the source language automatically.'
-    const payload = { role: 'user' as const, parts: [{ text: `Transcribe all spoken dialogue in this media exactly. Return only the transcript with no commentary.${languageHint}` }, { fileData: { fileUri: processed.uri, mimeType: processed.mimeType || mediaType } }] }
+    const requestMimeType = processed.mimeType || mediaType
+    const requestStructure = { model: TRANSCRIPTION_MODEL, contents: [{ role: 'user', parts: [{ text: 'transcription prompt' }, { fileData: { fileUri: processed.uri, mimeType: requestMimeType } }] }] }
+    console.log('[v0] Gemini transcription request prepared', { filename: file instanceof File ? file.name : 'audio.webm', detectedMimeType: file.type || 'empty', normalizedMimeType: mediaType, uploadedMimeType: processed.mimeType || 'empty', requestMimeType, fileSize: bytes.byteLength, model: TRANSCRIPTION_MODEL, fileUri: processed.uri, requestStructure })
+    const payload = { role: 'user' as const, parts: [{ text: `Transcribe all spoken dialogue in this media exactly. Return only the transcript with no commentary.${languageHint}` }, { fileData: { fileUri: processed.uri, mimeType: requestMimeType } }] }
     let response
     try {
       response = await ai.models.generateContent({ model: TRANSCRIPTION_MODEL, contents: [payload] })
     } catch (error) {
-      const raw = error instanceof Error ? error.message : String(error)
-      const statusMatch = raw.match(/\b(4\d\d|5\d\d)\b/)
-      const status = statusMatch ? Number(statusMatch[1]) : 502
-      console.error('[v0] Gemini transcription request', { status: 'error', httpStatus: status, error: raw.slice(0, 500), model: TRANSCRIPTION_MODEL })
-      throw new TranscriptionRuntimeError(raw.slice(0, 500), status)
+      const details = error && typeof error === 'object' ? error as { message?: string; status?: number; statusText?: string; error?: unknown; details?: unknown } : undefined
+      const raw = details?.message || (error instanceof Error ? error.message : String(error))
+      const parsed = (() => { try { return JSON.parse(raw) } catch { return undefined } })()
+      const status = details?.status || parsed?.error?.code || Number(raw.match(/\b(4\d\d|5\d\d)\b/)?.[1] || 502)
+      const usefulError = { message: parsed || raw, status, statusText: details?.statusText, error: details?.error, details: details?.details }
+      console.error('[v0] Gemini transcription request failed', { ...usefulError, model: TRANSCRIPTION_MODEL, requestStructure })
+      throw new TranscriptionRuntimeError(JSON.stringify(usefulError), status)
     }
     const candidateText = typeof response.text === 'string' ? response.text : ''
     const candidateParts = (response as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }).candidates?.flatMap(candidate => candidate.content?.parts?.map(part => part.text || '') || []) || []
