@@ -1,5 +1,5 @@
 export const AUDIO_EXTENSIONS = ['mpeg', 'mp3', 'wav', 'm4a', 'ogg', 'webm', 'flac'] as const
-export const AUDIO_MIME_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/x-mpeg', 'application/mp3', 'application/octet-stream', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/x-m4a', 'audio/ogg', 'audio/webm', 'audio/flac'] as const
+export const AUDIO_MIME_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/x-mpeg', 'application/mp3', 'application/octet-stream', 'audio/wav', 'audio/m4a', 'audio/x-wav', 'audio/mp4', 'audio/x-m4a', 'audio/ogg', 'audio/webm', 'audio/flac'] as const
 
 const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'mkv', 'avi'] as const
 const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska', 'video/x-msvideo'] as const
@@ -28,5 +28,5 @@ export function validateVideoFile(file: Pick<File, 'name' | 'type'>) {
   return { accepted: extensionAccepted && mimeAccepted, extension, mimeType: file.type || 'empty', reason: extensionAccepted && mimeAccepted ? '' : 'Unsupported video format. Use MP4, MOV, WebM, MKV, or AVI.' }
 }
 
-export const AUDIO_ACCEPT = '.mpeg,.mp3,.wav,.m4a,.ogg,.webm,.flac,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/webm,audio/flac'
+export const AUDIO_ACCEPT = '.mpeg,.mp3,.wav,.m4a,.ogg,.webm,.flac,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/m4a,audio/mp4,audio/ogg,audio/webm,audio/flac'
 export const VIDEO_ACCEPT = '.mp4,.mov,.webm,.mkv,.avi,video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-msvideo'
