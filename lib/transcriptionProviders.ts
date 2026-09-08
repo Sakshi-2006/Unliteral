@@ -8,7 +8,7 @@ export interface TranscriptionProvider {
 import { GoogleGenAI } from '@google/genai'
 import { normalizeAudioMime } from './mediaValidation'
 
-const TRANSCRIPTION_MODEL = 'gemini-3.5-transcribe'
+const TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
 
 function getClient() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -50,21 +50,10 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
     let response: { output_text?: string; error?: unknown }
     try {
-      console.log('[v0] Gemini request', {
-        model: TRANSCRIPTION_MODEL,
-        mediaType,
-        uploadedName: uploaded.name,
-        uploadedUri: processed.uri,
-        processedState: processed.state,
-        requestStructure,
-      })
+      console.log('[v0] Gemini request JSON', JSON.stringify(requestStructure))
       const interactionResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/interactions?key=${encodeURIComponent(apiKey || '')}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestStructure) })
       const responseText = await interactionResponse.text()
-      console.log('[v0] Gemini raw response', {
-        status: interactionResponse.status,
-        statusText: interactionResponse.statusText,
-        body: responseText,
-      })
+      console.log('[v0] Gemini raw response', JSON.stringify({ status: interactionResponse.status, statusText: interactionResponse.statusText, body: responseText }))
       let body: { output_text?: string; error?: unknown }
       try {
         body = JSON.parse(responseText) as { output_text?: string; error?: unknown }
@@ -77,12 +66,21 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
       const details = error && typeof error === 'object' ? error as { message?: string; status?: number; statusText?: string; error?: unknown; details?: unknown } : undefined
       const raw = details?.message || (error instanceof Error ? error.message : String(error))
       const parsed = (() => { try { return JSON.parse(raw) } catch { return undefined } })()
-      const status = details?.status || parsed?.error?.code || Number(raw.match(/\b(4\d\d|5\d\d)\b/)?.[1] || 502)
+      const status = Number(details?.status || parsed?.error?.code || raw.match(/\b(4\d\d|5\d\d)\b/)?.[1] || 502)
       const usefulError = { message: parsed || raw, status, statusText: details?.statusText, error: details?.error, details: details?.details }
       console.error('[v0] Gemini transcription request failed', { ...usefulError, model: TRANSCRIPTION_MODEL, requestStructure })
       throw new TranscriptionRuntimeError(JSON.stringify(usefulError), status)
     }
-    const transcript = (response.output_text || '').trim()
+    const collectText = (value: unknown, key = ''): string[] => {
+      if (typeof value === 'string' && ['text', 'output_text', 'transcript'].includes(key)) return [value]
+      if (Array.isArray(value)) return value.flatMap(item => collectText(item, key))
+      if (!value || typeof value !== 'object') return []
+      return Object.entries(value).flatMap(([childKey, childValue]) => {
+        if (childKey === 'signature') return []
+        return collectText(childValue, childKey)
+      })
+    }
+    const transcript = [...new Set(collectText(response))].join('\n').trim()
     if (!transcript) throw new TranscriptionRuntimeError('Gemini returned no transcript. The media may contain no detectable speech.', 502)
     try { await ai.files.delete({ name: uploaded.name }) } catch (cleanupError) { console.warn('[v0] Gemini file cleanup failed', { name: uploaded.name, error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError) }) }
     return { transcript, language: sourceLanguage || 'Auto Detect', duration: Math.round((Date.now() - started) / 1000) }
