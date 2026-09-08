@@ -51,9 +51,10 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
       log('GEMINI FILE PROCESSING', { state: processed.state, error: processed.error?.message })
     }
     if (processed.state !== 'ACTIVE') throw new TranscriptionRuntimeError(processed.error?.message || `Gemini file processing ended in ${processed.state || 'unknown'} state.`, 502, 'file_processing')
+    log('GEMINI ACTIVE FILE METADATA', { name: processed.name, uri: processed.uri, mimeType: processed.mimeType, state: processed.state, sizeBytes: processed.sizeBytes })
     const languageHint = sourceLanguage && sourceLanguage !== 'Auto Detect' ? ` The source language is ${sourceLanguage}; preserve it exactly.` : ' Detect the source language automatically.'
-    const requestMimeType = mediaType
     const isVideo = mediaType.startsWith('video/')
+    const requestMimeType = isVideo ? mediaType : 'audio/mp3'
     const requestStructure = { model: TRANSCRIPTION_MODEL, input: [{ type: 'text', text: `Generate a transcript of the speech in this ${isVideo ? 'video' : 'audio'}.${languageHint}` }, { type: isVideo ? 'video' : 'audio', uri: processed.uri, mime_type: requestMimeType }] }
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
     let response: { output_text?: string; error?: unknown }
