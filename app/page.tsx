@@ -78,20 +78,29 @@ function Lang({
   value,
   onChange,
   source = false,
+  includeAutoDetect = false,
   disabled = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   source?: boolean;
   disabled?: boolean;
+  includeAutoDetect?: boolean;
 }) {
+  const options = languages.filter((x) => source || includeAutoDetect || x.name !== "Auto Detect");
+  const autoDetect = options.filter((x) => x.name === "Auto Detect");
+  const indian = options.filter((x) => x.region === "India");
+  const international = options.filter((x) => x.name !== "Auto Detect" && x.region !== "India");
+  const renderOption = (item: (typeof languages)[number]) => (
+    <option key={item.name} value={item.name}>
+      {item.name}
+    </option>
+  );
   return (
     <select disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)}>
-      {languages
-        .filter((x) => source || x.name !== "Auto Detect")
-        .map((x) => (
-          <option key={x.name}>{x.name}</option>
-        ))}
+      {autoDetect.map(renderOption)}
+      <optgroup label="Indian languages">{indian.map(renderOption)}</optgroup>
+      <optgroup label="International languages">{international.map(renderOption)}</optgroup>
     </select>
   );
 }
@@ -494,6 +503,7 @@ function MediaWorkspace({
   const [targetLanguage, setTargetLanguage] = useState(
     defaultRequest.targetLanguage,
   );
+  const [mediaTargetLanguage, setMediaTargetLanguage] = useState("English");
   const [processingStage, setProcessingStage] = useState("");
   const generateTranscript = async () => {
     if (!file) return;
@@ -536,7 +546,7 @@ function MediaWorkspace({
           ...defaultRequest,
           sourceLanguage,
           text: transcript,
-          targetLanguage,
+          targetLanguage: mediaTargetLanguage,
         }),
       });
       const data = await response.json();
@@ -642,13 +652,26 @@ function MediaWorkspace({
           {videoFile && mode === "video" && (
             <video controls className="media-preview" src={videoUrl} />
           )}
-          <div className="lang-row media-language-row">
-            <Lang
-              source
-              value={sourceLanguage}
-              onChange={setSourceLanguage}
-              disabled={transcribing}
-            />
+          <div className="media-language-selector">
+            <div className="media-language-meta">
+              <span>YOUR SOURCE</span>
+              <span className="gemini-ready"><i /> GEMINI READY</span>
+            </div>
+            <div className="lang-row media-language-row">
+              <Lang
+                source
+                value={sourceLanguage}
+                onChange={setSourceLanguage}
+                disabled={transcribing}
+              />
+              <ArrowRight size={15} aria-hidden="true" />
+              <Lang
+                value={mediaTargetLanguage}
+                onChange={setMediaTargetLanguage}
+                includeAutoDetect
+                disabled={transcribing}
+              />
+            </div>
           </div>
           {mediaError && <p className="error-note">{mediaError}</p>}
           {file && !transcript && (
