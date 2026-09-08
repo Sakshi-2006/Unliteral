@@ -18,6 +18,6 @@ export async function POST(request: Request) {
     const status = error instanceof TranscriptionRuntimeError ? error.status : 502
     const message = error instanceof Error ? error.message : String(error)
     console.error('[v0] transcription route failed', { route: '/api/transcribe/audio', httpStatus: status, error: message.slice(0, 500) })
-    return NextResponse.json({ error: message }, { status })
+    return NextResponse.json({ success: false, stage: error instanceof TranscriptionRuntimeError ? error.stage || 'interaction' : 'interaction', message }, { status })
   }
 }

@@ -16,33 +16,41 @@ function getClient() {
   return new GoogleGenAI({ apiKey })
 }
 
+export type AudioFailureStage = 'gemini_file_upload' | 'file_processing' | 'interaction' | 'transcript_extraction'
+
 export class TranscriptionRuntimeError extends Error {
-  constructor(message: string, public status = 502) {
+  constructor(message: string, public status = 502, public stage?: AudioFailureStage) {
     super(message)
     this.name = 'TranscriptionRuntimeError'
   }
 }
 
 export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
-  private async transcribe(file: File | Blob, mediaType: string, sourceLanguage?: string): Promise<TranscriptionResult> {
+  private async transcribe(file: File | Blob, mediaType: string, sourceLanguage?: string, audioDiagnostics = false): Promise<TranscriptionResult> {
     const started = Date.now()
     const bytes = Buffer.from(await file.arrayBuffer())
     const ai = getClient()
+    const log = (stage: string, details: Record<string, unknown>) => { if (audioDiagnostics) console.log(`[v0] ${stage}`, details) }
+    log('AUDIO RECEIVED', { filename: file instanceof File ? file.name : 'audio.webm', extension: (file instanceof File ? file.name : 'audio.webm').toLowerCase().split('.').pop() || '', fileSize: file.size, fileType: file.type || 'empty' })
+    log('MIME NORMALIZATION', { originalMime: file.type || 'empty', normalizedMime: mediaType, mpegConfirmed: (file instanceof File ? file.name : '').toLowerCase().endsWith('.mpeg') ? mediaType === 'audio/mpeg' : undefined })
     let uploaded
     try {
       uploaded = await ai.files.upload({ file: new Blob([bytes], { type: mediaType }), config: { mimeType: mediaType, displayName: file instanceof File ? file.name : 'unliteral-media' } })
+      log('GEMINI FILE UPLOAD', { result: 'success', name: uploaded.name, uri: uploaded.uri, mimeType: uploaded.mimeType, state: uploaded.state })
     } catch (error) {
       const raw = error instanceof Error ? error.message : String(error)
-      console.error('[v0] Gemini file upload', { status: 'error', error: raw.slice(0, 500) })
-      throw new TranscriptionRuntimeError(raw.slice(0, 500), 502)
+      console.error('[v0] GEMINI FILE UPLOAD', { result: 'error', error: raw })
+      throw new TranscriptionRuntimeError(raw, 502, 'gemini_file_upload')
     }
-    if (!uploaded.name || !uploaded.uri) throw new TranscriptionRuntimeError('Gemini file upload did not return a usable reference.', 502)
+    if (!uploaded.name || !uploaded.uri) throw new TranscriptionRuntimeError('Gemini file upload did not return a usable reference.', 502, 'gemini_file_upload')
     let processed = uploaded
+    log('GEMINI FILE PROCESSING', { state: processed.state, error: processed.error?.message })
     for (let attempt = 0; attempt < 30 && processed.state === 'PROCESSING'; attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 1000))
       processed = await ai.files.get({ name: uploaded.name })
+      log('GEMINI FILE PROCESSING', { state: processed.state, error: processed.error?.message })
     }
-    if (processed.state !== 'ACTIVE') throw new TranscriptionRuntimeError(processed.error?.message || 'Gemini could not process this media file.', 502)
+    if (processed.state !== 'ACTIVE') throw new TranscriptionRuntimeError(processed.error?.message || `Gemini file processing ended in ${processed.state || 'unknown'} state.`, 502, 'file_processing')
     const languageHint = sourceLanguage && sourceLanguage !== 'Auto Detect' ? ` The source language is ${sourceLanguage}; preserve it exactly.` : ' Detect the source language automatically.'
     const requestMimeType = mediaType
     const isVideo = mediaType.startsWith('video/')
@@ -50,10 +58,10 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
     let response: { output_text?: string; error?: unknown }
     try {
-      console.log('[v0] Gemini request JSON', JSON.stringify(requestStructure))
+      log('GEMINI INTERACTION', { model: TRANSCRIPTION_MODEL, mediaType, inputType: isVideo ? 'video' : 'audio', mimeType: requestMimeType, requestJson: requestStructure })
       const interactionResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/interactions?key=${encodeURIComponent(apiKey || '')}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestStructure) })
       const responseText = await interactionResponse.text()
-      console.log('[v0] Gemini raw response', JSON.stringify({ status: interactionResponse.status, statusText: interactionResponse.statusText, body: responseText }))
+      log('GEMINI INTERACTION', { httpStatus: interactionResponse.status, statusText: interactionResponse.statusText, rawResponseJson: responseText })
       let body: { output_text?: string; error?: unknown }
       try {
         body = JSON.parse(responseText) as { output_text?: string; error?: unknown }
@@ -69,7 +77,7 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
       const status = Number(details?.status || parsed?.error?.code || raw.match(/\b(4\d\d|5\d\d)\b/)?.[1] || 502)
       const usefulError = { message: parsed || raw, status, statusText: details?.statusText, error: details?.error, details: details?.details }
       console.error('[v0] Gemini transcription request failed', { ...usefulError, model: TRANSCRIPTION_MODEL, requestStructure })
-      throw new TranscriptionRuntimeError(JSON.stringify(usefulError), status)
+      throw new TranscriptionRuntimeError(JSON.stringify(usefulError), status, 'interaction')
     }
     const collectText = (value: unknown, key = ''): string[] => {
       if (typeof value === 'string' && ['text', 'output_text', 'transcript'].includes(key)) return [value]
@@ -80,8 +88,10 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
         return collectText(childValue, childKey)
       })
     }
-    const transcript = [...new Set(collectText(response))].join('\n').trim()
-    if (!transcript) throw new TranscriptionRuntimeError('Gemini returned no transcript. The media may contain no detectable speech.', 502)
+    const extractedParts = [...new Set(collectText(response))]
+    const transcript = extractedParts.join('\n').trim()
+    log('TRANSCRIPT EXTRACTION', { interactionCompleted: Boolean(response && !response.error), outputPath: extractedParts.length ? 'nested text/output_text/transcript fields' : 'none', transcriptLength: transcript.length })
+    if (!transcript) throw new TranscriptionRuntimeError('Gemini returned no transcript. The media may contain no detectable speech.', 502, 'transcript_extraction')
     try { await ai.files.delete({ name: uploaded.name }) } catch (cleanupError) { console.warn('[v0] Gemini file cleanup failed', { name: uploaded.name, error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError) }) }
     return { transcript, language: sourceLanguage || 'Auto Detect', duration: Math.round((Date.now() - started) / 1000) }
   }
@@ -89,7 +99,7 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
     const filename = file instanceof File ? file.name : 'audio.webm'
     const mediaType = normalizeAudioMime(filename, file.type || 'audio/webm')
     console.log('[v0] audio transcription upload', { originalFilename: filename, extension: filename.toLowerCase().split('.').pop() || '', fileType: file.type || 'empty', normalizedMimeType: mediaType, fileSize: file.size })
-    return this.transcribe(file, mediaType, sourceLanguage)
+    return this.transcribe(file, mediaType, sourceLanguage, true)
   }
   async transcribeVideo(file: File | Blob, sourceLanguage?: string): Promise<TranscriptionResult> {
     return this.transcribe(file, file.type || 'video/mp4', sourceLanguage)
