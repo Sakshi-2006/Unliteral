@@ -78,13 +78,15 @@ function Lang({
   value,
   onChange,
   source = false,
+  disabled = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   source?: boolean;
+  disabled?: boolean;
 }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)}>
+    <select disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)}>
       {languages
         .filter((x) => source || x.name !== "Auto Detect")
         .map((x) => (
@@ -394,24 +396,16 @@ function MediaWorkspace({
     const validation = validateFile(candidate);
     setMediaError(validation.accepted ? "" : validation.reason);
     if (!validation.accepted) return;
-    console.log("[v0] audio file selected", {
-      originalFilename: candidate.name,
-      extension: validation.extension,
-      fileType: candidate.type || "empty",
-      normalizedMimeType:
-        mode === "audio" && ["mpeg", "mp3"].includes(validation.extension)
-          ? "audio/mpeg"
-          : candidate.type || "application/octet-stream",
-      fileSize: candidate.size,
-    });
     if (mode === "audio") {
       setAudioTranscript("");
       setLocalizedTranscript(null);
+      setSourceLanguage("Auto Detect");
       setAudioFile(candidate);
       setAudioUrl(URL.createObjectURL(candidate));
     } else {
       setVideoTranscript("");
       setLocalizedTranscript(null);
+      setSourceLanguage("Auto Detect");
       setVideoFile(candidate);
       setVideoUrl(URL.createObjectURL(candidate));
     }
@@ -421,6 +415,9 @@ function MediaWorkspace({
       setAudioFile(null);
       setAudioTranscript("");
       setLocalizedTranscript(null);
+      setSourceLanguage("Auto Detect");
+      setProcessingStage("");
+      setTranscribing(false);
       setAudioUrl("");
       setSeconds(0);
       setRecording(false);
@@ -429,6 +426,9 @@ function MediaWorkspace({
       setVideoFile(null);
       setVideoTranscript("");
       setLocalizedTranscript(null);
+      setSourceLanguage("Auto Detect");
+      setProcessingStage("");
+      setTranscribing(false);
       setVideoUrl("");
       localStorage.removeItem("unliteral_video_workspace");
     }
@@ -488,6 +488,9 @@ function MediaWorkspace({
       );
     }
   };
+  const [sourceLanguage, setSourceLanguage] = useState(
+    defaultRequest.sourceLanguage,
+  );
   const [targetLanguage, setTargetLanguage] = useState(
     defaultRequest.targetLanguage,
   );
@@ -503,7 +506,7 @@ function MediaWorkspace({
       setProcessingStage("Transcribing…");
       const form = new FormData();
       form.append(mode, file);
-      form.append("sourceLanguage", defaultRequest.sourceLanguage);
+      form.append("sourceLanguage", sourceLanguage);
       const response = await fetch(`/api/transcribe/${mode}`, {
         method: "POST",
         body: form,
@@ -531,6 +534,7 @@ function MediaWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...defaultRequest,
+          sourceLanguage,
           text: transcript,
           targetLanguage,
         }),
@@ -638,6 +642,14 @@ function MediaWorkspace({
           {videoFile && mode === "video" && (
             <video controls className="media-preview" src={videoUrl} />
           )}
+          <div className="lang-row media-language-row">
+            <Lang
+              source
+              value={sourceLanguage}
+              onChange={setSourceLanguage}
+              disabled={transcribing}
+            />
+          </div>
           {mediaError && <p className="error-note">{mediaError}</p>}
           {file && !transcript && (
             <button
