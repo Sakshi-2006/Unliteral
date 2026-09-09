@@ -1,33 +1,202 @@
-# Unliteral
+# UNLITERAL
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+## Translate the culture, not just the words.
 
-## Built with v0
+UNLITERAL is an AI-powered cultural translation platform for storytellers. It focuses on adapting dialogue beyond literal translation by preserving cultural context, slang, humour, subtext, and character intent.
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+The project is built for the **Agentic Cinema: The Blockbuster Hackathon — Lights. Camera. Code.**
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_CobywVSBV94sQ5Vm6mDhWq3cM6Cr)
+## Problem
+
+Literal translation often changes the meaning and personality of dialogue. Slang, cultural references, humour, and contextual expressions may lose their intended meaning when translated word-for-word.
+
+UNLITERAL helps storytellers adapt content so that translated dialogue feels natural and culturally appropriate for its target audience.
+
+## Key Features
+
+### Cultural Translation
+
+* AI-powered translation using Google Gemini
+* Context-aware dialogue adaptation
+* Preserves the intent and meaning of dialogue rather than translating word-for-word
+* Handles slang, humour, cultural references, and subtext
+* Generates natural-sounding translated dialogue
+
+### Audio and Video Processing
+
+* Upload and process supported audio and video files
+* Generate transcripts from uploaded media
+* Translate media content using the AI translation pipeline
+* Audio and video workflows are handled separately according to their supported formats
+
+### Language Support
+
+* Source and target language selection
+* Support for multiple languages through the translation system
+* Language-aware translation and cultural adaptation
+
+### AI Translation Pipeline
+
+UNLITERAL uses Google Gemini to:
+
+1. Understand the original dialogue
+2. Identify context and intent
+3. Interpret cultural meaning
+4. Adapt expressions for the target audience
+5. Generate natural translated dialogue
+
+### Project Workspace
+
+* Studio-based interface for working with translation projects
+* Media upload workflow
+* Transcript generation
+* Translation workflow
+* Project-oriented workspace for storytellers
+
+## Technology Stack
+
+### Frontend
+
+* Next.js
+* React
+* TypeScript
+* Tailwind CSS
+* shadcn/ui
+* Lucide React
+
+### AI
+
+* Google Gemini
+* Google GenAI SDK
+
+### Search
+
+* Parallel Search API
+
+### Deployment
+
+* Vercel
+
+### Development
+
+* Git
+* GitHub
+* Visual Studio Code
+
+## Architecture
+
+```text
+User
+  |
+  v
+UNLITERAL Studio
+  |
+  +------------------+
+  |                  |
+  v                  v
+Audio / Video       Text
+  |                  |
+  +--------+---------+
+           |
+           v
+     Gemini AI
+           |
+           v
+Context & Intent Understanding
+           |
+           v
+Cultural Adaptation
+           |
+           v
+Natural Translation
+           |
+           v
+Translated Dialogue
+```
+
+## Project Structure
+
+```text
+UNLITERAL/
+├── app/
+│   ├── api/
+│   ├── auth/
+│   ├── page.tsx
+│   └── layout.tsx
+├── components/
+├── lib/
+│   ├── gemini.ts
+│   ├── localizationEngine.ts
+│   ├── mediaProviders.ts
+│   ├── mediaValidation.ts
+│   ├── parallel.ts
+│   └── transcriptionProviders.ts
+├── agent/
+├── public/
+├── package.json
+└── README.md
+```
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+* Node.js
+* npm or pnpm
+* Google Gemini API access
+* Parallel API access
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Sakshi-2006/Unliteral.git
+cd Unliteral
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create a `.env` file and add the required API credentials:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+PARALLEL_API_KEY=your_parallel_api_key
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+http://localhost:3000
+```
 
-## Learn More
+## Team
 
-To learn more, take a look at the following resources:
+### Team Members
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+* Sakshi Karwade
+* Shubhi Jain
+* Dhiraj Kumar
+* Shristy Singh
+
+## Hackathon
+
+UNLITERAL was developed for:
+
+**Agentic Cinema: The Blockbuster Hackathon — Lights. Camera. Code.**
+
+The project explores how AI can help storytellers adapt dialogue across languages and cultures while retaining the original meaning, intent, and character voice.
+
+## License
+
+This project is open source and available under the MIT License.
