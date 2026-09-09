@@ -1,6 +1,8 @@
 import os
 import requests
 from google.adk.agents import Agent
+from google.adk.models import Gemini
+from google import genai
 
 
 PARALLEL_SEARCH_URL = os.getenv(
@@ -53,11 +55,21 @@ def research_cultural_context(
             "status": "error",
             "message": str(error),
         }
+EXPRESS_API_KEY = os.environ["GOOGLE_GENAI_API_KEY"]
 
+express_client = genai.Client(
+    vertexai=True,
+    api_key=EXPRESS_API_KEY,
+)
+
+express_gemini = Gemini(
+    model="gemini-3.5-flash",
+    client=express_client,
+)
 
 root_agent = Agent(
     name="unliteral_cultural_localization_agent",
-    model="gemini-3.5-flash",
+    model=express_gemini,
     description=(
         "UNLITERAL's AI agent for culturally accurate localization "
         "of dialogue, slang, idioms, regional expressions and references."
