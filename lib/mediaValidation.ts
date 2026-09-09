@@ -6,7 +6,8 @@ const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x
 
 function extensionOf(name: string) {
   const cleanName = name.trim().toLowerCase().split(/[?#]/, 1)[0]
-  return cleanName.includes('.') ? cleanName.split('.').pop() || '' : ''
+  const extension = cleanName.includes('.') ? cleanName.slice(cleanName.lastIndexOf('.') + 1) : cleanName
+  return extension.replace(/^\./, '')
 }
 
 export function normalizeAudioMime(name: string, mimeType: string) {
@@ -16,10 +17,11 @@ export function normalizeAudioMime(name: string, mimeType: string) {
 export function validateAudioFile(file: Pick<File, 'name' | 'type'>) {
   const extension = extensionOf(file.name)
   const extensionAccepted = AUDIO_EXTENSIONS.includes(extension as (typeof AUDIO_EXTENSIONS)[number])
-  const mimeAccepted = !file.type || AUDIO_MIME_TYPES.includes(file.type as (typeof AUDIO_MIME_TYPES)[number])
-  const knownVideoMime = file.type.startsWith('video/')
+  const mimeType = file.type.trim().toLowerCase()
+  const mimeAccepted = !mimeType || AUDIO_MIME_TYPES.includes(mimeType as (typeof AUDIO_MIME_TYPES)[number])
+  const knownVideoMime = mimeType.startsWith('video/')
   const accepted = !knownVideoMime && (extensionAccepted || mimeAccepted)
-  return { accepted, extension, mimeType: file.type || 'empty', reason: accepted ? '' : 'Unsupported audio format. Use MPEG, MP3, WAV, M4A, OGG, WebM, or FLAC.' }
+  return { accepted, extension, mimeType: mimeType || 'empty', reason: accepted ? '' : 'Unsupported audio format. Use MPEG, MP3, WAV, M4A, OGG, WebM, or FLAC.' }
 }
 
 export function validateVideoFile(file: Pick<File, 'name' | 'type'>) {
