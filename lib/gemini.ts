@@ -5,7 +5,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 export const GEMINI_MODEL = 'gemini-3.5-flash'
 
 export function getGeminiApiKey() {
-  return process.env.GEMINI_API_KEY?.trim() || ''
+  return process.env.GEMINI_API_KEY_2?.trim() || ''
 }
 
 export function isGeminiConfigured() {
