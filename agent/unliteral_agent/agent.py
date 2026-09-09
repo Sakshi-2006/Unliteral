@@ -1,13 +1,31 @@
 import os
 import requests
+
+from dotenv import load_dotenv
+from google import genai
 from google.adk.agents import Agent
 from google.adk.models import Gemini
-from google import genai
 
+# Load .env BEFORE creating the Gemini client
+load_dotenv()
 
 PARALLEL_SEARCH_URL = os.getenv(
     "PARALLEL_SEARCH_URL",
     "https://unliteral.vercel.app/api/parallel/search",
+)
+
+EXPRESS_API_KEY = os.environ["GOOGLE_GENAI_API_KEY"]
+
+# Explicitly create the Google Agent Platform Express Mode client.
+# This is the same configuration that already worked in your direct test.
+express_client = genai.Client(
+    vertexai=True,
+    api_key=EXPRESS_API_KEY,
+)
+
+express_gemini = Gemini(
+    model="gemini-3.5-flash",
+    client=express_client,
 )
 
 
@@ -18,13 +36,6 @@ def research_cultural_context(
     """
     Researches cultural, slang, idiomatic, and regional context
     using UNLITERAL's existing Parallel integration.
-
-    Args:
-        text: Dialogue or text containing a cultural reference.
-        language: Target language for the localization.
-
-    Returns:
-        A dictionary containing the research result.
     """
 
     try:
@@ -55,17 +66,7 @@ def research_cultural_context(
             "status": "error",
             "message": str(error),
         }
-EXPRESS_API_KEY = os.environ["GOOGLE_GENAI_API_KEY"]
 
-express_client = genai.Client(
-    vertexai=True,
-    api_key=EXPRESS_API_KEY,
-)
-
-express_gemini = Gemini(
-    model="gemini-3.5-flash",
-    client=express_client,
-)
 
 root_agent = Agent(
     name="unliteral_cultural_localization_agent",
