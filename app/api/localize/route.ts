@@ -1,9 +1,7 @@
-import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
 import { NextResponse } from 'next/server'
 import { defaultRequest, type LocalizationRequest, type LocalizationResult } from '../../../lib/localizationEngine'
-
-const model = google('gemini-3.5-flash')
+import { getGeminiModel } from '../../../lib/gemini'
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +10,7 @@ export async function POST(request: Request) {
     if (!input.text.trim()) return NextResponse.json({ error: 'Text is required.' }, { status: 400 })
 
     const prompt = `You are UNLITERAL, a cultural localization editor. Adapt the source dialogue so it feels native in the target language, preserving intent, tone, humor, subtext, and character voice. Do not explain outside the JSON.\n\nRequest:\n${JSON.stringify(input)}\n\nReturn valid JSON with exactly these keys: localizedText (string), literalTranslation (string), detectedLanguage (string), slangDetected (string[]), culturalReferences (string[]), tone (string), emotion (string), adaptations (string[]), qualityChecks (string[]), alternatives (string[]).`
-    const { text } = await generateText({ model, prompt, temperature: 0.35 })
+    const { text } = await generateText({ model: getGeminiModel(), prompt, temperature: 0.35 })
     const parsed = JSON.parse(text.replace(/^```json\s*|\s*```$/g, '')) as Partial<LocalizationResult>
     const result: LocalizationResult = {
       originalText: input.text,

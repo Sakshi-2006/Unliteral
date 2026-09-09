@@ -7,11 +7,12 @@ export interface TranscriptionProvider {
 
 import { GoogleGenAI } from '@google/genai'
 import { normalizeAudioMime } from './mediaValidation'
+import { getGeminiApiKey, GEMINI_MODEL } from './gemini'
 
-const TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
+const TRANSCRIPTION_MODEL = GEMINI_MODEL
 
 function getClient() {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
+  const apiKey = getGeminiApiKey()
   if (!apiKey) throw new TranscriptionRuntimeError('Gemini API key is not configured.', 503)
   return new GoogleGenAI({ apiKey })
 }
@@ -56,7 +57,7 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
     const isVideo = mediaType.startsWith('video/')
     const requestMimeType = isVideo ? mediaType : 'audio/mp3'
     const requestStructure = { model: TRANSCRIPTION_MODEL, input: [{ type: 'text', text: `Generate a transcript of the speech in this ${isVideo ? 'video' : 'audio'}.${languageHint}` }, { type: isVideo ? 'video' : 'audio', uri: processed.uri, mime_type: requestMimeType }] }
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = getGeminiApiKey()
     let response: { output_text?: string; error?: unknown }
     try {
       log('GEMINI INTERACTION', { model: TRANSCRIPTION_MODEL, mediaType, inputType: isVideo ? 'video' : 'audio', mimeType: requestMimeType, requestJson: requestStructure })
