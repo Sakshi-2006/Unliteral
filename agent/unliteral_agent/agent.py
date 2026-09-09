@@ -1,12 +1,10 @@
 import os
 import requests
-
 from dotenv import load_dotenv
 from google import genai
 from google.adk.agents import Agent
-from google.adk.models import Gemini
+from google.adk.models.google_llm import Gemini
 
-# Load .env BEFORE creating the Gemini client
 load_dotenv()
 
 PARALLEL_SEARCH_URL = os.getenv(
@@ -14,15 +12,19 @@ PARALLEL_SEARCH_URL = os.getenv(
     "https://unliteral.vercel.app/api/parallel/search",
 )
 
-EXPRESS_API_KEY = os.environ["GOOGLE_GENAI_API_KEY"]
+EXPRESS_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY")
 
-# Explicitly create the Google Agent Platform Express Mode client.
-# This is the same configuration that already worked in your direct test.
+if not EXPRESS_API_KEY:
+    raise RuntimeError("GOOGLE_GENAI_API_KEY is missing")
+
+
+# Google Express Mode client
 express_client = genai.Client(
     vertexai=True,
     api_key=EXPRESS_API_KEY,
 )
 
+# ADK Gemini model using the Express Mode client
 express_gemini = Gemini(
     model="gemini-3.5-flash",
     client=express_client,
@@ -33,10 +35,7 @@ def research_cultural_context(
     text: str,
     language: str = "English",
 ) -> dict:
-    """
-    Researches cultural, slang, idiomatic, and regional context
-    using UNLITERAL's existing Parallel integration.
-    """
+    """Research cultural context using UNLITERAL's Parallel integration."""
 
     try:
         response = requests.post(
@@ -54,11 +53,9 @@ def research_cultural_context(
                 "message": f"Parallel research failed: HTTP {response.status_code}",
             }
 
-        data = response.json()
-
         return {
             "status": "success",
-            "research": data,
+            "research": response.json(),
         }
 
     except Exception as error:
