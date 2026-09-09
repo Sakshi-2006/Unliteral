@@ -75,10 +75,10 @@ export class GoogleCloudTranscriptionProvider implements TranscriptionProvider {
       const details = error && typeof error === 'object' ? error as { message?: string; status?: number; statusText?: string; error?: unknown; details?: unknown } : undefined
       const raw = details?.message || (error instanceof Error ? error.message : String(error))
       const parsed = (() => { try { return JSON.parse(raw) } catch { return undefined } })()
-      const status = Number(details?.status || parsed?.error?.code || raw.match(/\b(4\d\d|5\d\d)\b/)?.[1] || 502)
-      const usefulError = { message: parsed || raw, status, statusText: details?.statusText, error: details?.error, details: details?.details }
-      console.error('[v0] Gemini transcription request failed', { ...usefulError, model: TRANSCRIPTION_MODEL, requestStructure })
-      throw new TranscriptionRuntimeError(JSON.stringify(usefulError), status, 'interaction')
+      const status = Number(details?.status || parsed?.error?.status || raw.match(/\b(4\d\d|5\d\d)\b/)?.[1] || 502)
+      const providerMessage = parsed?.error?.message || parsed?.message || raw
+      console.error('[v0] Gemini transcription request failed', { status, message: providerMessage, model: TRANSCRIPTION_MODEL, requestStructure })
+      throw new TranscriptionRuntimeError(String(providerMessage), status, 'interaction')
     }
     const collectText = (value: unknown, key = ''): string[] => {
       if (typeof value === 'string' && ['text', 'output_text', 'transcript'].includes(key)) return [value]

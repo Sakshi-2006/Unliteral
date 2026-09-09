@@ -509,26 +509,26 @@ function MediaWorkspace({
     if (!file) return;
     setTranscribing(true);
     setProcessingStage(
-      mode === "video" ? "Extracting audio…" : "Processing audio…",
+      mode === "video" ? "Extracting audio…" : "Processing audio��",
     );
     setMediaError("");
     try {
       setProcessingStage("Transcribing…");
       const form = new FormData();
-      form.append(mode, file);
+      form.append(mode, file, file.name);
       form.append("sourceLanguage", sourceLanguage);
       const response = await fetch(`/api/transcribe/${mode}`, {
         method: "POST",
         body: form,
       });
       const data = await response.json();
-      if (!response.ok)
-        throw new Error(
-          "Transcription could not be completed. Please try again.",
-        );
+      if (!response.ok) {
+        const detail = typeof data.message === "string" ? data.message : typeof data.error === "string" ? data.error : "Transcription could not be completed. Please try again.";
+        throw new Error(data.stage ? `${data.stage}: ${detail}` : detail);
+      }
       setTranscript(data.transcript || "");
     } catch (error) {
-      setMediaError("Transcription could not be completed. Please try again.");
+      setMediaError(error instanceof Error ? error.message : "Transcription could not be completed. Please try again.");
     } finally {
       setProcessingStage("");
       setTranscribing(false);

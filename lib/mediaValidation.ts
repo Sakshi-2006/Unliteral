@@ -5,7 +5,8 @@ const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'mkv', 'avi'] as const
 const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska', 'video/x-msvideo'] as const
 
 function extensionOf(name: string) {
-  return name.toLowerCase().split('.').pop() || ''
+  const cleanName = name.trim().toLowerCase().split(/[?#]/, 1)[0]
+  return cleanName.includes('.') ? cleanName.split('.').pop() || '' : ''
 }
 
 export function normalizeAudioMime(name: string, mimeType: string) {
