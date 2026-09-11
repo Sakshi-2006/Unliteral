@@ -20,7 +20,7 @@ UNLITERAL helps storytellers adapt content so that translated dialogue feels nat
 * Context-aware dialogue adaptation
 * Preserves the intent and meaning of dialogue rather than translating word-for-word
 * Handles slang, humour, cultural references, and subtext
-* Generates natural-sounding translated dialogue
+* Generates Natural-Sounding translated dialogue
 
 ### Audio and Video Processing
 
